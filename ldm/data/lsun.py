@@ -56,6 +56,7 @@ class LSUNBase(Dataset):
         image = self.flip(image)
         image = np.array(image).astype(np.uint8)
         example["image"] = (image / 127.5 - 1.0).astype(np.float32)
+        example["caption"] = "hello world"
         return example
 
 
@@ -72,12 +73,12 @@ class LSUNChurchesValidation(LSUNBase):
 
 class LSUNBedroomsTrain(LSUNBase):
     def __init__(self, **kwargs):
-        super().__init__(txt_file="data/lsun/bedrooms_train.txt", data_root="data/lsun/bedrooms", **kwargs)
+        super().__init__(txt_file="data/lsun/bedrooms_train.txt", data_root="/projects/katefgroup/datasets/lsun//bedroom_train_flat", **kwargs)
 
 
 class LSUNBedroomsValidation(LSUNBase):
     def __init__(self, flip_p=0.0, **kwargs):
-        super().__init__(txt_file="data/lsun/bedrooms_val.txt", data_root="data/lsun/bedrooms",
+        super().__init__(txt_file="data/lsun/bedrooms_val.txt", data_root="/projects/katefgroup/datasets/lsun//bedroom_train_flat",
                          flip_p=flip_p, **kwargs)
 
 

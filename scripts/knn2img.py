@@ -1,5 +1,7 @@
 import argparse, os, sys, glob
 import clip
+import ipdb
+st = ipdb.set_trace
 import torch
 import torch.nn as nn
 import numpy as np
@@ -356,6 +358,7 @@ if __name__ == "__main__":
                         prompts = list(prompts)
                     c = clip_text_encoder.encode(prompts)
                     uc = None
+                    st()
                     if searcher is not None:
                         nn_dict = searcher(c, opt.knn)
                         c = torch.cat([c, torch.from_numpy(nn_dict['nn_embeddings']).cuda()], dim=1)

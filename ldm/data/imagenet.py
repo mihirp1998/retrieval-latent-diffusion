@@ -13,6 +13,8 @@ from torch.utils.data import Dataset, Subset
 import taming.data.utils as tdu
 from taming.data.imagenet import str_to_indices, give_synsets_from_indices, download, retrieve
 from taming.data.imagenet import ImagePaths
+import ipdb
+st = ipdb.set_trace
 
 from ldm.modules.image_degradation import degradation_fn_bsr, degradation_fn_bsr_light
 
@@ -40,6 +42,7 @@ class ImageNetBase(Dataset):
         return len(self.data)
 
     def __getitem__(self, i):
+        st()
         return self.data[i]
 
     def _prepare(self):
@@ -132,7 +135,7 @@ class ImageNetBase(Dataset):
 
 
 class ImageNetTrain(ImageNetBase):
-    NAME = "ILSVRC2012_train"
+    NAME = "train"
     URL = "http://www.image-net.org/challenges/LSVRC/2012/"
     AT_HASH = "a306397ccf9c2ead27155983c254227c0fd938e2"
     FILES = [
@@ -144,17 +147,19 @@ class ImageNetTrain(ImageNetBase):
 
     def __init__(self, process_images=True, data_root=None, **kwargs):
         self.process_images = process_images
-        self.data_root = data_root
+        self.data_root = '/projects/katefgroup/datasets/ImageNet/'
+        # st()
         super().__init__(**kwargs)
 
     def _prepare(self):
+        # st()
         if self.data_root:
             self.root = os.path.join(self.data_root, self.NAME)
         else:
             cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
             self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
 
-        self.datadir = os.path.join(self.root, "data")
+        self.datadir = os.path.join(self.root)
         self.txt_filelist = os.path.join(self.root, "filelist.txt")
         self.expected_length = 1281167
         self.random_crop = retrieve(self.config, "ImageNetTrain/random_crop",
