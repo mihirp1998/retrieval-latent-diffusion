@@ -4,7 +4,8 @@ import PIL
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-
+import ipdb
+st = ipdb.set_trace
 
 class LSUNBase(Dataset):
     def __init__(self,
@@ -56,7 +57,7 @@ class LSUNBase(Dataset):
         image = self.flip(image)
         image = np.array(image).astype(np.uint8)
         example["image"] = (image / 127.5 - 1.0).astype(np.float32)
-        example["caption"] = "hello world"
+        st()
         return example
 
 

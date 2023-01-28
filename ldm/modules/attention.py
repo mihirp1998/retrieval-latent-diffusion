@@ -4,7 +4,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn, einsum
 from einops import rearrange, repeat
-
+import ipdb
+st = ipdb.set_trace
 from ldm.modules.diffusionmodules.util import checkpoint
 
 
@@ -249,6 +250,7 @@ class SpatialTransformer(nn.Module):
 
     def forward(self, x, context=None):
         # note: if no context is given, cross-attention defaults to self-attention
+        # st()
         b, c, h, w = x.shape
         x_in = x
         x = self.norm(x)

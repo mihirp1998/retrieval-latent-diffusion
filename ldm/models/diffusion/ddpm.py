@@ -17,6 +17,7 @@ from einops import rearrange, repeat
 from contextlib import contextmanager
 from functools import partial
 from tqdm import tqdm
+import omegaconf
 from torchvision.utils import make_grid
 from pytorch_lightning.utilities.distributed import rank_zero_only
 
@@ -342,8 +343,9 @@ class DDPM(pl.LightningModule):
         return loss, loss_dict
 
     def training_step(self, batch, batch_idx):
+        # st()
         loss, loss_dict = self.shared_step(batch)
-
+        # st()
         self.log_dict(loss_dict, prog_bar=True,
                       logger=True, on_step=True, on_epoch=True)
 
@@ -358,10 +360,12 @@ class DDPM(pl.LightningModule):
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
+
         _, loss_dict_no_ema = self.shared_step(batch)
         with self.ema_scope():
             _, loss_dict_ema = self.shared_step(batch)
             loss_dict_ema = {key + '_ema': loss_dict_ema[key] for key in loss_dict_ema}
+        # st()
         self.log_dict(loss_dict_no_ema, prog_bar=False, logger=True, on_step=False, on_epoch=True)
         self.log_dict(loss_dict_ema, prog_bar=False, logger=True, on_step=False, on_epoch=True)
 
@@ -379,6 +383,7 @@ class DDPM(pl.LightningModule):
     @torch.no_grad()
     def log_images(self, batch, N=8, n_row=2, sample=True, return_keys=None, **kwargs):
         log = dict()
+        st()
         x = self.get_input(batch, self.first_stage_key)
         N = min(x.shape[0], N)
         n_row = min(x.shape[0], n_row)
@@ -673,9 +678,19 @@ class LatentDiffusion(DDPM):
                 elif cond_key == 'class_label':
                     xc = batch
                 else:
-                    xc = super().get_input(batch, cond_key).to(self.device)
+                    # custom conditioning
+                    if isinstance(type(cond_key),type(omegaconf.listconfig.ListConfig)):
+                        xc = []
+                        for ck in cond_key:
+                            if ck == "caption":
+                                xc.append(batch[ck])
+                            else:
+                                xc.append(super().get_input(batch, ck).to(self.device))
+                    else:
+                        xc = super().get_input(batch, cond_key).to(self.device)
             else:
                 xc = x
+            # st()
             if not self.cond_stage_trainable or force_c_encode:
                 if isinstance(xc, dict) or isinstance(xc, list):
                     # import pudb; pudb.set_trace()
@@ -874,6 +889,7 @@ class LatentDiffusion(DDPM):
     def forward(self, x, c, *args, **kwargs):
         # st()
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
+
         if self.model.conditioning_key is not None:
             assert c is not None
             if self.cond_stage_trainable:
@@ -894,7 +910,6 @@ class LatentDiffusion(DDPM):
         return [rescale_bbox(b) for b in bboxes]
 
     def apply_model(self, x_noisy, t, cond, return_ids=False):
-
         if isinstance(cond, dict):
             # hybrid case, cond is exptected to be a dict
             pass
@@ -1256,7 +1271,7 @@ class LatentDiffusion(DDPM):
     def log_images(self, batch, N=8, n_row=4, sample=True, ddim_steps=200, ddim_eta=1., return_keys=None,
                    quantize_denoised=True, inpaint=True, plot_denoise_rows=False, plot_progressive_rows=True,
                    plot_diffusion_rows=True, **kwargs):
-
+        # st()
         use_ddim = ddim_steps is not None
 
         log = dict()
@@ -1273,6 +1288,17 @@ class LatentDiffusion(DDPM):
             if hasattr(self.cond_stage_model, "decode"):
                 xc = self.cond_stage_model.decode(c)
                 log["conditioning"] = xc
+            elif isinstance(type(self.cond_stage_key),type(omegaconf.listconfig.ListConfig)):
+                if 'caption' in self.cond_stage_key:
+                    xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
+                    log["conditioning_caption"] = xc
+                if 'support_images' in self.cond_stage_key:
+                    # xc = [self.cond_stage_model.decode(c) for c 
+                    # in c]
+                    # st()
+                    support_images = batch['support_images'].split(3,-1)
+                    for idx, si in enumerate(support_images):
+                        log[f"support_images_{idx}"] =  si.permute(0,3,1,2)
             elif self.cond_stage_key in ["caption"]:
                 xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
                 log["conditioning"] = xc
@@ -1405,6 +1431,7 @@ class DiffusionWrapper(pl.LightningModule):
         assert self.conditioning_key in [None, 'concat', 'crossattn', 'hybrid', 'adm']
 
     def forward(self, x, t, c_concat: list = None, c_crossattn: list = None):
+        # st()
         if self.conditioning_key is None:
             out = self.diffusion_model(x, t)
         elif self.conditioning_key == 'concat':

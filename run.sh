@@ -1,0 +1,2 @@
+# python main.py --base configs/latent-diffusion/lsun_bedrooms-ldm-vq-4.yaml -t --gpus=0, --rn lsun_bedroom_train
+ python main.py --base configs/latent-diffusion/rlbench_debug.yaml -t --gpus=0, --rn rlbench_debug

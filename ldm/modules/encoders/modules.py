@@ -4,6 +4,8 @@ from functools import partial
 import clip
 from einops import rearrange, repeat
 import kornia
+import ipdb
+st = ipdb.set_trace
 
 
 from ldm.modules.x_transformer import Encoder, TransformerWrapper  # TODO: can we directly rely on lucidrains code and simply add this as a reuirement? --> test
@@ -200,3 +202,46 @@ class FrozenClipImageEmbedder(nn.Module):
         # x is assumed to be in range [-1,1]
         return self.model.encode_image(self.preprocess(x))
 
+
+
+
+class RlBenchContextEmbedder(nn.Module):
+    """
+        Uses the CLIP image encoder.
+        """
+    def __init__(
+            self,
+            model,
+            jit=False,
+            device='cuda' if torch.cuda.is_available() else 'cpu',
+            antialias=False,
+        ):
+        super().__init__()
+        self.clip_image = FrozenClipImageEmbedder(model)
+        self.clip_text = FrozenCLIPTextEmbedder(model)
+        self.clip_image.eval()
+        self.clip_text.eval()
+        for param in self.clip_text.parameters():
+            param.requires_grad = False
+        for param in self.clip_image.parameters():
+            param.requires_grad = False
+        # print('hello')
+        self.support_embed = nn.Parameter(torch.randn(1))
+        self.target_embed = nn.Parameter(torch.randn(1))
+        self.text_embed = nn.Parameter(torch.randn(1))
+
+
+    def forward(self, x):
+        image,text = x
+        with torch.no_grad():
+            text_encode = self.clip_text(text).unsqueeze(1)
+            B,C,H,W = image.shape
+            image_concat = torch.concat(image.split(3,1),0)
+            image_encode = self.clip_image(image_concat)
+            image_encodings = torch.stack(image_encode.split(B,0),1)
+        encodings = torch.cat([text_encode,image_encodings],1)
+        id_embed = torch.cat([self.text_embed, self.support_embed,self.target_embed],0)
+        id_embed = id_embed.unsqueeze(-1).unsqueeze(0).repeat(B,1,1)
+        encodings = torch.cat([encodings,id_embed],-1)
+        # st()
+        return encodings

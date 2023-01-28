@@ -1,0 +1,10 @@
+*.zip
+*.ckpt
+__pycache__
+wandb
+logs
+outputs
+tmp*
+*.log
+data/lsun/
+data/rdm/
