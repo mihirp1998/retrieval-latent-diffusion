@@ -245,3 +245,72 @@ class RlBenchContextEmbedder(nn.Module):
         encodings = torch.cat([encodings,id_embed],-1)
         # st()
         return encodings
+
+
+
+class RlBenchMultiContextEmbedder(nn.Module):
+    """
+        Uses the CLIP image encoder.
+        """
+    def __init__(
+            self,
+            model,
+            jit=False,
+            device='cuda' if torch.cuda.is_available() else 'cpu',
+            antialias=False,
+        ):
+        super().__init__()
+        self.clip_image = FrozenClipImageEmbedder(model)
+        self.clip_text = FrozenCLIPTextEmbedder(model)
+        self.clip_image.eval()
+        self.clip_text.eval()
+        for param in self.clip_text.parameters():
+            param.requires_grad = False
+        for param in self.clip_image.parameters():
+            param.requires_grad = False
+        # print('hello')
+        self.support_embed = nn.Parameter(torch.randn(128))
+        self.target_embed = nn.Parameter(torch.randn(128))
+        self.text_embed = nn.Parameter(torch.randn(128))
+        self.no_time_embed = nn.Parameter(torch.randn(128))        
+        self.no_target_image_embed = nn.Parameter(torch.randn(896))
+        self.time_encode = nn.Linear(1,128)
+
+
+
+    def forward(self, x):
+        support_images,target_images,support_idxs,target_idx, text_captions = x
+        # st()
+        # image,text = x
+        with torch.no_grad():
+            text_encode = self.clip_text(text_captions).unsqueeze(1)
+            B,C,H,W = support_images.shape
+            support_image_concat = torch.concat(support_images.split(3,1),0)
+            support_image_encode = self.clip_image(support_image_concat)
+            target_encodings = self.clip_image(target_images).unsqueeze(1)
+            support_encodings = torch.stack(support_image_encode.split(B,0),1)
+            
+            B,N_support, _ = support_encodings.shape
+            _,N_target, _ = target_encodings.shape
+
+
+        support_embed = self.support_embed.unsqueeze(0).unsqueeze(0).repeat(B,N_support,1)
+        target_embed = self.target_embed.unsqueeze(0).unsqueeze(0).repeat(B,N_target,1)
+        no_time_embed = self.no_time_embed.unsqueeze(0).unsqueeze(0).repeat(B,1,1)
+        no_target_image_embed = self.no_target_image_embed.unsqueeze(0).unsqueeze(0).repeat(B,1,1)
+
+
+        text_embed = self.text_embed.unsqueeze(0).unsqueeze(0).repeat(B,1,1)
+
+        support_idxs_embed = self.time_encode(support_idxs.unsqueeze(-1))
+        target_idxs_embed = self.time_encode(target_idx.unsqueeze(-1).unsqueeze(-1))
+
+
+        support_encodings = torch.cat([support_encodings,support_embed,support_idxs_embed],-1)
+        target_encodings = torch.cat([target_encodings,target_embed,no_time_embed],-1)
+        target_topredict_encodings = torch.cat([no_target_image_embed,target_idxs_embed],-1)
+        text_encode = torch.cat([text_encode,text_embed,no_time_embed],-1)
+        # st()        
+        # st()
+        encodings = torch.cat([text_encode,support_encodings,target_encodings, target_topredict_encodings],1)
+        return encodings

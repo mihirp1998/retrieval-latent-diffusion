@@ -69,21 +69,22 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 2
-    num_workers: 0
+    batch_size: 64
+    num_workers: 12
     wrap: false
     train:
       target: ldm.data.rlbench.RLBenchTrain
       params:
-        dataset_type: intra_variations      
+        dataset_type: intra_variations
         config:
           size: 256
+
 lightning:
   callbacks:
     image_logger:
       target: main.ImageLogger
       params:
-        batch_frequency: 1
+        batch_frequency: 2500
         max_images: 1
         increase_log_steps: False
 

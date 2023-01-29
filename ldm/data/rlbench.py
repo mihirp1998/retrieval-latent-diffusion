@@ -28,7 +28,7 @@ class RlBenchBase(Dataset):
         # transform,
     ):
         super(RlBenchBase, self).__init__()
-        fix_suport_cam = False
+        fix_suport_cam = True
         overfit=False        
         # st()
         # all_tasks = glob.glob(data_dir +"/*" )
@@ -46,8 +46,10 @@ class RlBenchBase(Dataset):
     
         self.fix_suport_cam = fix_suport_cam
         self.data_dir = data_dir
+        self.num_support_frames = 10
 
         self.camera_views = ["front_rgb","left_shoulder_rgb","right_shoulder_rgb","overhead_rgb"]
+        # self.camera_views = ["front_rgb"]
 
         self.overfit = overfit
         # self.transform = transform
@@ -76,30 +78,51 @@ class RlBenchBase(Dataset):
 
             task_folder, variation_folder = task_valk.split("/")
 
+            support_pickle = f"{self.data_dir}/{support_episode_dir}/{task_folder}/{variation_folder}/variation_descriptions.pkl"
+            target_pickle = f"{self.data_dir}/{target_episode_dir}/{task_folder}/{variation_folder}/variation_descriptions.pkl"
+
+            all_task_desc_supp = pickle.load(open(support_pickle,'rb'))
+            all_task_desc_target = pickle.load(open(target_pickle,'rb'))
+            task_desc = random.sample(all_task_desc_target,1)
+            
+            assert all_task_desc_supp == all_task_desc_target
+
             support_folder_name = f"{self.data_dir}/{support_episode_dir}/{task_folder}/{variation_folder}/episodes/{support_episode_name}/"
             target_folder_name = f"{self.data_dir}/{target_episode_dir}/{task_folder}/{variation_folder}/episodes/{target_episode_name}/"
             support_len = self.taskset[task_valk][support_episode]
             target_len = self.taskset[task_valk][target_episode]
-            support_gap  = support_len//5
-            target_gap  = target_len//5
-            support_frames_idx = [random.randint(support_gap*i,support_gap*(i+1)-1) for i in range(5)]
-            target_frames_idx = [random.randint(target_gap*i,target_gap*(i+1)-1) for i in range(5)]
-            target_frames_idx  = random.sample(target_frames_idx,2)
-            target_frames_idx.sort()
+            support_gap  = support_len//self.num_support_frames
+            # target_gap  = target_len//5
+            support_frames_idx = [random.randint(support_gap*i,support_gap*(i+1)-1) for i in range(self.num_support_frames)]
+            target_frames_idx = [0,random.randint(1,target_len-1)]
+            # target_frames_idx = [random.randint(target_gap*i,target_gap*(i+1)-1) for i in range(5)]
+            # target_frames_list_index  = random.sample(list(range(len(target_frames_idx))),1)
+
+            # target_frames_idx.sort()
             # st()
             camera_view_support, camera_view_target  = random.sample(self.camera_views,2)
 
             if self.fix_suport_cam:
                 camera_view_support = "front_rgb"
-            # st()
-            support_rgb = [self.transform(Image.open(f"{support_folder_name}/{camera_view_support}/{idx}.png").convert('RGB')) for idx in support_frames_idx]
-            target_rgb = [self.transform(Image.open(f"{target_folder_name}/{camera_view_target}/{idx}.png").convert('RGB')) for idx in target_frames_idx]
-            support_rgb_stack = torch.stack(support_rgb)
-            target_rgb_stack = torch.stack(target_rgb)
-            support_idxs = torch.tensor(support_frames_idx).float()/support_len
-            target_idxs = torch.tensor(target_frames_idx).float()/target_len
-            # st()
+            support_rgb = [self.normalize(Image.open(f"{support_folder_name}/{camera_view_support}/{idx}.png").convert('RGB')) for idx in support_frames_idx]
+            target_rgb = [self.normalize(Image.open(f"{target_folder_name}/{camera_view_target}/{idx}.png").convert('RGB')) for idx in target_frames_idx]
+            support_rgbs = torch.cat(support_rgb,0)
+            target_init_rgb, target_later_rgb = target_rgb
 
+            support_rgbs = (support_rgbs.permute(1,2,0)*2.0) -1.0
+            target_init_rgb = (target_init_rgb.permute(1,2,0)*2.0) -1.0
+            target_later_rgb = (target_later_rgb.permute(1,2,0)*2.0) -1.0
+            # st()
+            support_idxs = torch.tensor(support_frames_idx).float()/support_len
+            target_idxs = torch.tensor(target_frames_idx[1]).float()/target_len
+
+            example["support_images"] = support_rgbs
+            example["target_images"] = target_init_rgb
+            example["support_idxs"] = support_idxs
+            example["target_idx"] = target_idxs
+            example["caption"] = task_desc[0]
+            example["image"] = target_later_rgb
+            # st()
             # return support_rgb_stack, target_rgb_stack, support_idxs, target_idxs, target_len
         elif self.dataset_type == "intra_views":
             # st()
@@ -181,7 +204,6 @@ class RlBenchBase(Dataset):
 
 class RLBenchTrain(RlBenchBase):
     def __init__(self, dataset_type='intra_views', dataset='train_val_dict.pkl', data_dir='/projects/katefgroup/rlbench_custom/', **kwargs):
-        # st()
         super().__init__(dataset_type=dataset_type, dataset=dataset, data_dir=data_dir,**kwargs)
 
 

@@ -556,6 +556,7 @@ class LatentDiffusion(DDPM):
         return self.scale_factor * z
 
     def get_learned_conditioning(self, c):
+        # st()
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
                 c = self.cond_stage_model.encode(c)
@@ -669,6 +670,7 @@ class LatentDiffusion(DDPM):
         encoder_posterior = self.encode_first_stage(x)
         z = self.get_first_stage_encoding(encoder_posterior).detach()
 
+        # st()
         if self.model.conditioning_key is not None:
             if cond_key is None:
                 cond_key = self.cond_stage_key
@@ -681,16 +683,17 @@ class LatentDiffusion(DDPM):
                     # custom conditioning
                     if isinstance(type(cond_key),type(omegaconf.listconfig.ListConfig)):
                         xc = []
+                        # st()
                         for ck in cond_key:
-                            if ck == "caption":
+                            if ck == "caption" or "idx" in ck:
                                 xc.append(batch[ck])
                             else:
+                                # image
                                 xc.append(super().get_input(batch, ck).to(self.device))
                     else:
                         xc = super().get_input(batch, cond_key).to(self.device)
             else:
                 xc = x
-            # st()
             if not self.cond_stage_trainable or force_c_encode:
                 if isinstance(xc, dict) or isinstance(xc, list):
                     # import pudb; pudb.set_trace()
@@ -1299,6 +1302,9 @@ class LatentDiffusion(DDPM):
                     support_images = batch['support_images'].split(3,-1)
                     for idx, si in enumerate(support_images):
                         log[f"support_images_{idx}"] =  si.permute(0,3,1,2)
+                if 'target_images' in self.cond_stage_key:
+                    log[f"target_images"] =  batch['target_images'].permute(0,3,1,2)
+                # st()
             elif self.cond_stage_key in ["caption"]:
                 xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
                 log["conditioning"] = xc
